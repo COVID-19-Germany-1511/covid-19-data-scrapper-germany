@@ -10,7 +10,6 @@ licenses
 .tmp
 coverage/
 certificates/local*
-test.sh
 
 ## ------------------------ Node + Runtime
 node_modules/

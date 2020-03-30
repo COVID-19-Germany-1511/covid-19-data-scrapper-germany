@@ -29,4 +29,6 @@ jobs:
         run: |
           git config --local user.name 'Fetch Action'
           git config --local user.email '1713709+emm-ess@users.noreply.github.com'
-          { git commit -am "Automated data fetch" && git push } || true
+          { 
+            git commit -am "Automated data fetch" && git push 
+          } || true
