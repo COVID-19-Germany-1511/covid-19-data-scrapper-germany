@@ -1,7 +1,7 @@
 {
   "name": "covid-19-data-scrapper-germany",
   "version": "1.0.0",
-  "description": "A scrapper to track COVID-19 in Germany",
+  "description": "A scrapper for COVID-19 related data in Germany.",
   "main": "dist/index.js",
   "scripts": {
     "prebuild": "rimraf dist",
