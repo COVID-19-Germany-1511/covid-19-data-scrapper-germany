@@ -11,6 +11,9 @@ const PAPA_CONFIG: ParseConfig = {
 const DATA_DIR = path.resolve(__dirname, '../data');
 
 function toQueryDate(date: string | number) {
+  if (typeof date === 'string') {
+    date = parseInt(date);
+  }
   date = new Date(date).toISOString();
   const splitted = date.split('T');
   return `${splitted[0]} ${splitted[1].split('.')[0]}`;
@@ -23,7 +26,7 @@ function writeToCSV(name: string, data: any[], overwrite?: boolean) {
   if (newFile) {
     fs.writeFileSync(file, csv, { encoding: 'utf8' });
   } else {
-    fs.appendFileSync(file, csv, { encoding: 'utf8' });
+    fs.appendFileSync(file, `\n${csv}`, { encoding: 'utf8' });
   }
 }
 
@@ -36,6 +39,10 @@ async function queryMeta() {
     outFields: ['IdBundesland', 'Bundesland', 'IdLandkreis', 'Landkreis'],
     returnDistinctValues: true,
   });
+
+  if (!data) {
+    return;
+  }
 
   const states = data
     .filter(({ IdBundesland }, index, self) => {
@@ -65,7 +72,7 @@ function getLastSavedDate(fields: FieldsArray): string | void {
   const file = fs.readFileSync(`${DATA_DIR}/rawData.csv`, { encoding: 'utf8' });
   const { data } = papa.parse(file, PAPA_CONFIG);
   // TODO: really check fields
-  if (!data.length && data.length === fields.length) {
+  if (data.length && Object.keys(data[0]).length === fields.length) {
     const lastEntry = data[data.length - 1];
     return toQueryDate(lastEntry.Meldedatum);
   }
@@ -74,19 +81,19 @@ function getLastSavedDate(fields: FieldsArray): string | void {
 async function updateData(fields: FieldsArray) {
   const lastSavedDate = getLastSavedDate(fields);
 
-  /* eslint-disable */
   const where = lastSavedDate
-    ? `NeuerFall IN(0, 1) AND Meldedatum > timestamp '${toQueryDate(
-        lastSavedDate,
-      )}'`
+    ? `Meldedatum>timestamp '${lastSavedDate}' AND NeuerFall IN(0, 1)`
     : 'NeuerFall IN(0, 1)';
-  /* eslint-enable */
 
   const data = await queryData({
     where,
     outFields: fields,
     orderByFields: 'Meldedatum asc',
   });
+  if (!data) {
+    return;
+  }
+  console.log(data.length);
   writeToCSV('rawData', data, !lastSavedDate);
 }
 

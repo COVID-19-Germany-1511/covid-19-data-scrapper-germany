@@ -20,7 +20,7 @@ type QueryParams = Pick<
 type FullParams = {
   where: string;
   outFields: string;
-  f: 'pjson' | 'html';
+  f: 'json' | 'html';
   orderByFields?: string;
   returnIdsOnly?: boolean;
   returnUniqueIdsOnly?: boolean;
@@ -72,7 +72,7 @@ export type FieldsArray = Array<keyof Fields>;
 
 const API_URLS = {
   covid:
-    'https://services7.arcgis.com/mOBPykOjAyBO2ZKk/ArcGIS/rest/services/RKI_COVID19/FeatureServer/0/query',
+    'https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/RKI_COVID19/FeatureServer/0/query',
 };
 const PAGE_SIZE = 2000;
 
@@ -115,31 +115,35 @@ async function getCount({ where }: ImmutableObject<QueryParams>) {
 }
 
 async function getData(params: ImmutableObject<FullParams>) {
-  const { data } = await axios.get(API_URLS.covid, { params });
+  const { data } = await axios.get('${API_URLS.covid}', { params });
   const { features } = data as Response;
   return features.map(({ attributes }) => attributes);
 }
 
 export async function queryData<T extends keyof Fields>(
   payload: ImmutableObject<QueryParams & { outFields: Array<T> }>,
-) {
+): Promise<Array<Pick<Fields, T>> | void> {
   const params: FullParams = {
     ...payload,
     outFields: payload.outFields.join(','),
-    f: 'pjson',
+    f: 'json',
     cacheHint: true,
     resultRecordCount: PAGE_SIZE,
     returnGeometry: false,
     spatialRel: 'esriSpatialRelIntersects',
   };
   const count = await getCount(payload);
+  if (count === 0) {
+    return;
+  }
   const pages = Math.ceil(count / PAGE_SIZE);
   const promises = [];
   for (let i = 0; i < pages; i++) {
     promises.push(getData({ ...params, resultOffset: i * PAGE_SIZE }));
   }
-  const results: any = await Promise.all(promises);
-  return results.flat().forEach((entry: any) => {
+  const results: any[] = (await Promise.all(promises)).flat();
+  results.forEach((entry: any) => {
     delete entry.ObjectId;
-  }) as Array<Pick<Fields, T>>;
+  });
+  return results as Array<Pick<Fields, T>>;
 }
