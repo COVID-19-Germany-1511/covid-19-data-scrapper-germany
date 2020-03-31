@@ -93,7 +93,7 @@ async function updateData(fields: FieldsArray) {
   if (!data) {
     return;
   }
-  console.log(data.length);
+  console.log(`got ${data.length} new entries`);
   writeToCSV('rawData', data, !lastSavedDate);
 }
 

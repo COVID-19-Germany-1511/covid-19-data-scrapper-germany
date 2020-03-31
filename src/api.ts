@@ -19,7 +19,7 @@ type QueryParams = Pick<
 
 type FullParams = {
   where: string;
-  outFields: string;
+  outFields?: string;
   f: 'json' | 'html';
   orderByFields?: string;
   returnIdsOnly?: boolean;
@@ -103,9 +103,9 @@ const AGE_GROUPS = [
 const SEX = ['W', 'M', 'unbekannt'] as const;
 
 async function getCount({ where }: ImmutableObject<QueryParams>) {
-  const params = {
+  const params: FullParams = {
     where,
-    f: 'pjson',
+    f: 'json',
     returnCountOnly: true,
   };
   const {
@@ -115,7 +115,7 @@ async function getCount({ where }: ImmutableObject<QueryParams>) {
 }
 
 async function getData(params: ImmutableObject<FullParams>) {
-  const { data } = await axios.get('${API_URLS.covid}', { params });
+  const { data } = await axios.get(API_URLS.covid, { params });
   const { features } = data as Response;
   return features.map(({ attributes }) => attributes);
 }
