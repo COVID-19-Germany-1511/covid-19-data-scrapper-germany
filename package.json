@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "description": "A scrapper for COVID-19 related data in Germany.",
   "main": "dist/index.js",
+  "types": "types/*.d.ts",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "npx prettier --write src/**/*.ts && npx eslint --cache src/**/*.ts",
+    "lint": "npx prettier --write {src,types}/**/*.ts && npx eslint --cache {src,types}/**/*.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -16,26 +17,26 @@
     "@babel/core": "^7.9.0",
     "@babel/preset-env": "^7.9.0",
     "@babel/preset-typescript": "^7.9.0",
-    "@types/jest": "^25.1.4",
-    "@types/node": "^13.9.5",
+    "@types/jest": "^25.1.5",
+    "@types/node": "^13.11.0",
     "@types/papaparse": "^5.0.3",
-    "@typescript-eslint/eslint-plugin": "^2.25.0",
-    "@typescript-eslint/parser": "^2.25.0",
-    "babel-jest": "^25.2.3",
+    "@typescript-eslint/eslint-plugin": "^2.26.0",
+    "@typescript-eslint/parser": "^2.26.0",
+    "babel-jest": "^25.2.6",
     "eslint": "^6.8.0",
-    "eslint-config-prettier": "^6.10.0",
+    "eslint-config-prettier": "^6.10.1",
     "eslint-plugin-prettier": "^3.1.2",
     "husky": "^4.2.3",
-    "jest": "^25.2.3",
-    "lint-staged": "^10.1.0",
+    "jest": "^25.2.7",
+    "lint-staged": "^10.1.1",
     "npm-run-all": "^4.1.5",
-    "prettier": "^1.19.1",
+    "prettier": "^2.0.2",
     "rimraf": "^3.0.2",
     "typescript": "^3.8.3"
   },
   "dependencies": {
     "axios": "0.19.2",
-    "papaparse": "5.1.1"
+    "papaparse": "5.2.0"
   },
   "husky": {
     "hooks": {
