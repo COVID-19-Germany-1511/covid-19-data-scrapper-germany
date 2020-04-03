@@ -1,4 +1,4 @@
-import { CDG } from 'types';
+import { CDG } from '../types';
 
 export const API_URLS = {
   covid:
@@ -34,10 +34,10 @@ export const AGE_GROUPS = [
 
 export const SEX = ['W', 'M', 'unbekannt'] as const;
 
-export const START_DATE = 1579824000000;
+export const CASE_STATES = ['confirmed', 'death'] as const;
 
-export const META: Omit<CDG.Meta, 'states' | 'counties'> = {
-  startDate: START_DATE,
-  age: AGE_GROUPS,
+export const META: Omit<CDG.Meta, 'states' | 'counties' | 'startDate'> = {
+  ages: AGE_GROUPS,
   sex: SEX,
+  caseStates: CASE_STATES,
 };

@@ -1,4 +1,4 @@
-import { AGE_GROUPS, SEX } from '../src/const';
+import { AGE_GROUPS, SEX, CASE_STATES } from '../src/const';
 
 declare namespace CDG {
   type StateInfo = {
@@ -12,7 +12,7 @@ declare namespace CDG {
     name: string;
   };
 
-  type CaseState = 'confirmed' | 'deaths';
+  type CaseState = ValuesOf<typeof CASE_STATES>;
 
   type Sex = ValuesOf<typeof SEX>;
 
@@ -40,7 +40,8 @@ declare namespace CDG {
     states: OptimizedObjectArray<StateInfo[]>;
     counties: OptimizedObjectArray<CountyInfo[]>;
     sex: typeof SEX;
-    age: typeof AGE_GROUPS;
+    ages: typeof AGE_GROUPS;
+    caseStates: typeof CASE_STATES;
   };
 
   type OptimizedObjectArray<

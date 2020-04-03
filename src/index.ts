@@ -1,156 +1,153 @@
 import fs from 'fs';
 import path from 'path';
-import papa, { ParseConfig } from 'papaparse';
+import papa from 'papaparse';
 
-import { queryData } from './api';
-import { META } from './const';
-import { CDG } from 'types';
-
-const PAPA_CONFIG: ParseConfig = {
-  header: true,
-};
+import { QueriedFields, fetchDataIfDifferentCount } from './api';
+import { META, SEX, AGE_GROUPS } from './const';
+import { mergeObjectArrays, optimizeObjArray, filterUnique } from './lib';
+import { CDG } from '../types';
 
 const DATA_DIR = path.resolve(__dirname, '../data');
 
-function toQueryDate(date: string | number) {
-  if (typeof date === 'string') {
-    date = parseInt(date);
-  }
-  date = new Date(date).toISOString();
-  const splitted = date.split('T');
-  return `${splitted[0]} ${splitted[1].split('.')[0]}`;
+const MILLIES_PER_DAY = 24 * 60 * 60 * 1000;
+
+function writeToCSV(name: string, data: any[]) {
+  const csv = papa.unparse(data, { header: true });
+  fs.writeFileSync(`${DATA_DIR}/${name}.csv`, csv, { encoding: 'utf8' });
 }
 
-function writeToCSV(name: string, data: any[], overwrite?: boolean) {
-  const file = `${DATA_DIR}/${name}.csv`;
-  const newFile = overwrite || !fs.existsSync(file);
-  const csv = papa.unparse(data, { header: newFile });
-  if (newFile) {
-    fs.writeFileSync(file, csv, { encoding: 'utf8' });
-  } else {
-    fs.appendFileSync(file, `\n${csv}`, { encoding: 'utf8' });
+function loadCSV(name: string): any[] | undefined {
+  const fileName = `${DATA_DIR}/${name}.csv`;
+  if (!fs.existsSync(fileName)) {
+    return;
   }
+  const file = fs.readFileSync(fileName, {
+    encoding: 'utf8',
+  });
+  const { data } = papa.parse(file, { header: true, dynamicTyping: true });
+  return data;
 }
 
-type MetaQueryResponse = Pick<
-  CDG.RKI.Fields,
-  'IdBundesland' | 'Bundesland' | 'IdLandkreis' | 'Landkreis'
->[];
+class DataScrapper {
+  data: QueriedFields[] = [];
+  savedStates: CDG.StateInfo[];
+  savedCounties: CDG.CountyInfo[];
 
-function saveRawMetaStates(data: MetaQueryResponse): CDG.StateInfo[] {
-  const states = data
-    .filter(({ IdBundesland }, index, self) => {
-      return (
-        // eslint-disable-next-line
-        index === self.findIndex((other) => other.IdBundesland === IdBundesland)
-      );
-    })
+  constructor() {
+    this.savedStates = loadCSV('raw/states') || [];
+    this.savedCounties = loadCSV('raw/counties') || [];
+  }
+
+  async fetchData() {
+    const oldCount = loadCSV('raw/data')?.length || 0;
+    this.data = (await fetchDataIfDifferentCount(oldCount)) || [];
+    this.data.sort((a, b) => a.Meldedatum - b.Meldedatum);
+  }
+
+  saveData() {
+    if (this.data.length) {
+      writeToCSV('raw/states', this.states);
+      writeToCSV('raw/counties', this.counties);
+      writeToCSV('raw/data', this.rawData);
+      writeToCSV('data', this.optimizedData);
+      const meta = JSON.stringify(this.meta);
+      fs.writeFileSync(`${DATA_DIR}/meta.json`, meta, { encoding: 'utf8' });
+    }
+  }
+
+  get states() {
+    const newStates = this.data
+      .filter(filterUnique('IdBundesland'))
+      // eslint-disable-next-line prettier/prettier
+      .map((state) => ({
+        id: state.IdBundesland,
+        name: state.Bundesland,
+      }));
+    return mergeObjectArrays(this.savedStates, newStates, 'id').sort(
+      (a, b) => a.id - b.id,
+    );
+  }
+
+  get counties() {
+    const newCounties = this.data
+      .filter(filterUnique('IdLandkreis'))
+      // eslint-disable-next-line prettier/prettier
+      .map((county) => ({
+        id: parseInt(county.IdLandkreis),
+        name: county.Landkreis,
+        stateId: county.IdBundesland,
+      }));
+    return mergeObjectArrays(this.savedCounties, newCounties, 'id').sort(
+      (a, b) => a.id - b.id,
+    );
+  }
+
+  get days() {
+    return this.data
+      .map(({ Meldedatum }) => Meldedatum)
+      .filter((day, index, self) => {
+        return index === self.indexOf(day);
+      });
+  }
+
+  get startDate() {
+    return Math.min(...this.days);
+  }
+
+  get meta(): CDG.Meta {
+    return {
+      ...META,
+      startDate: this.startDate,
+      states: optimizeObjArray(this.states),
+      counties: optimizeObjArray(this.counties),
+    };
+  }
+
+  get rawData() {
     // eslint-disable-next-line
-    .map((state) => ({
-      id: state.IdBundesland,
-      name: state.Bundesland,
-    }));
-  writeToCSV('raw/states', states, true);
-  return states;
-}
-
-function saveRawMetaCounties(data: MetaQueryResponse): CDG.CountyInfo[] {
-  // eslint-disable-next-line
-  const counties = data.map((county) => ({
-    id: parseInt(county.IdLandkreis),
-    name: county.Landkreis,
-    stateId: county.IdBundesland,
-  }));
-  writeToCSV('raw/counties', counties, true);
-  return counties;
-}
-
-export function optimizeObjArray<T extends Array<{ [key: string]: any }>>(
-  objArr: T,
-): CDG.OptimizedObjectArray<T> {
-  const fields = Object.keys(objArr[0]);
-  // eslint-disable-next-line
-  const values = objArr.map((obj) => fields.map((field) => obj[field]));
-  return { fields, values };
-}
-
-function saveMeta(states: CDG.StateInfo[], counties: CDG.CountyInfo[]) {
-  const meta: CDG.Meta = {
-    ...META,
-    states: optimizeObjArray(states),
-    counties: optimizeObjArray(counties),
-  };
-  fs.writeFileSync(`${DATA_DIR}/meta.json`, JSON.stringify(meta), {
-    encoding: 'utf8',
-  });
-}
-
-async function queryMeta() {
-  if (
-    fs.existsSync(`${DATA_DIR}/raw/states.csv`) &&
-    fs.existsSync(`${DATA_DIR}/raw/counties.csv`)
-  ) {
-    return;
+    return this.data.map((entry) => {
+      const mapped = { ...entry };
+      delete mapped.Bundesland;
+      delete mapped.Landkreis;
+      return mapped;
+    });
   }
-  const data = await queryData({
-    where: 'IdBundesland IS NOT NULL',
-    outFields: ['IdBundesland', 'Bundesland', 'IdLandkreis', 'Landkreis'],
-    returnDistinctValues: true,
-  });
 
-  if (data) {
-    const states = saveRawMetaStates(data);
-    const counties = saveRawMetaCounties(data);
-    saveMeta(states, counties);
+  get optimizedData() {
+    const { startDate } = this;
+    const result: CDG.CaseRecord[] = [];
+    // eslint-disable-next-line
+    this.data.forEach((entry) => {
+      const optimized = {
+        state: entry.IdBundesland,
+        county: parseInt(entry.IdLandkreis),
+        date: (entry.Meldedatum - startDate) / MILLIES_PER_DAY,
+        sex: SEX.indexOf(entry.Geschlecht),
+        age: AGE_GROUPS.indexOf(entry.Altersgruppe),
+      };
+      if (entry.AnzahlFall > 0) {
+        result.push({
+          ...optimized,
+          caseState: 0,
+          count: entry.AnzahlFall,
+        });
+      }
+      if (entry.AnzahlTodesfall > 0) {
+        result.push({
+          ...optimized,
+          caseState: 1,
+          count: entry.AnzahlTodesfall,
+        });
+      }
+    });
+    return result;
   }
-}
-
-function getLastSavedDate(fields: CDG.RKI.FieldsArray): string | void {
-  if (!fs.existsSync(`${DATA_DIR}/raw/data.csv`)) {
-    return;
-  }
-  const file = fs.readFileSync(`${DATA_DIR}/raw/data.csv`, {
-    encoding: 'utf8',
-  });
-  const { data } = papa.parse(file, PAPA_CONFIG);
-  // TODO: really check fields
-  if (data.length && Object.keys(data[0]).length === fields.length) {
-    const lastEntry = data[data.length - 1];
-    return toQueryDate(lastEntry.Meldedatum);
-  }
-}
-
-async function updateData(fields: CDG.RKI.FieldsArray) {
-  const lastSavedDate = getLastSavedDate(fields);
-
-  const where = lastSavedDate
-    ? `Meldedatum>timestamp '${lastSavedDate}' AND NeuerFall IN(0, 1)`
-    : 'NeuerFall IN(0, 1)';
-
-  const data = await queryData({
-    where,
-    outFields: fields,
-    orderByFields: 'Meldedatum asc',
-  });
-  if (!data) {
-    return;
-  }
-  console.log(`got ${data.length} new entries`);
-  writeToCSV('raw/data', data, !lastSavedDate);
 }
 
 async function main() {
-  Promise.all([
-    queryMeta(),
-    updateData([
-      'IdBundesland',
-      'IdLandkreis',
-      'Altersgruppe',
-      'Geschlecht',
-      'AnzahlFall',
-      'AnzahlTodesfall',
-      'Meldedatum',
-    ] as CDG.RKI.FieldsArray),
-  ]);
+  fs.mkdirSync(`${DATA_DIR}/raw`, { recursive: true });
+  const scrapper = new DataScrapper();
+  await scrapper.fetchData();
+  scrapper.saveData();
 }
 main();

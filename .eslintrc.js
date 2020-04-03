@@ -71,7 +71,7 @@ module.exports = {
         allowAllPropertiesOnSameLine: true,
       },
     ],
-    'arrow-parens': ['error', 'as-needed', { requireForBlockBody: false }],
+    // 'arrow-parens': ['error', 'as-needed', { requireForBlockBody: false }],
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/array-type': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',

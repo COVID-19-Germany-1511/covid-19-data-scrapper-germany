@@ -1,8 +1,22 @@
 import axios from 'axios';
 import { API_URLS, RKI_PAGE_SIZE } from './const';
-import { CDG } from 'types';
+import { CDG } from '../types';
 
-async function getCount({ where }: ImmutableObject<CDG.RKI.QueryParams>) {
+const QUERY_FIELDS = [
+  'IdBundesland',
+  'Bundesland',
+  'IdLandkreis',
+  'Landkreis',
+  'Altersgruppe',
+  'Geschlecht',
+  'AnzahlFall',
+  'AnzahlTodesfall',
+  'Meldedatum',
+] as const;
+
+export type QueriedFields = Pick<CDG.RKI.Fields, ValuesOf<typeof QUERY_FIELDS>>;
+
+export async function getCount(where: string) {
   const params: CDG.RKI.FullParams = {
     where,
     f: 'json',
@@ -20,22 +34,24 @@ async function getData(params: ImmutableObject<CDG.RKI.FullParams>) {
   return features.map(({ attributes }) => attributes);
 }
 
-export async function queryData<T extends keyof CDG.RKI.Fields>(
-  payload: ImmutableObject<CDG.RKI.QueryParams & { outFields: Array<T> }>,
-): Promise<Array<Pick<CDG.RKI.Fields, T>> | void> {
+export async function fetchDataIfDifferentCount(
+  oldCount: number,
+): Promise<QueriedFields[] | undefined> {
+  const where = 'NeuerFall IN(0, 1)';
+
+  const count = await getCount(where);
+  if (count === 0 || count === oldCount) {
+    return;
+  }
   const params: CDG.RKI.FullParams = {
-    ...payload,
-    outFields: payload.outFields.join(','),
+    where,
+    outFields: QUERY_FIELDS.join(','),
     f: 'json',
     cacheHint: true,
     resultRecordCount: RKI_PAGE_SIZE,
     returnGeometry: false,
     spatialRel: 'esriSpatialRelIntersects',
   };
-  const count = await getCount(payload);
-  if (count === 0) {
-    return;
-  }
   const pages = Math.ceil(count / RKI_PAGE_SIZE);
   const promises = [];
   for (let i = 0; i < pages; i++) {
@@ -45,5 +61,5 @@ export async function queryData<T extends keyof CDG.RKI.Fields>(
   results.forEach((entry: any) => {
     delete entry.ObjectId;
   });
-  return results as Array<Pick<CDG.RKI.Fields, T>>;
+  return results;
 }
