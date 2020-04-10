@@ -17,15 +17,15 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v2
 
-      - name: Cache Build
-        id: cache-build
-        uses: actions/cache@v1
-        with:
-          path: dist
-          key: ${{ runner.os }}-build-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**') }}
+      # - name: Cache Build
+      #   id: cache-build
+      #   uses: actions/cache@v1
+      #   with:
+      #     path: dist
+      #     key: build-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**') }}
 
       - name: Install and Build
-        if: steps.cache-build.outputs.cache-hit != 'true'
+        # if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           npm install
           npm run build
