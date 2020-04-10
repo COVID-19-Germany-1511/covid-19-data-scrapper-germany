@@ -2,7 +2,11 @@ name: Fetch new data
 
 on:
   push:
+    branches:
+      - master
   pull_request:
+    branches:
+      - master
   schedule:
     - cron:  '*/30 * * * *'
 
