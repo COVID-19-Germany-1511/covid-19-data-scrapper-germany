@@ -28,6 +28,11 @@ function loadCSV(name: string): any[] | undefined {
   return data;
 }
 
+function writeToJSON(name: string, data: any) {
+  const json = JSON.stringify(data);
+  fs.writeFileSync(`${DATA_DIR}/${name}.json`, json, { encoding: 'utf8' });
+}
+
 class DataScrapper {
   data: QueriedFields[] = [];
   savedStates: CDG.StateInfo[];
@@ -49,9 +54,8 @@ class DataScrapper {
       writeToCSV('raw/states', this.states);
       writeToCSV('raw/counties', this.counties);
       writeToCSV('raw/data', this.rawData);
-      writeToCSV('data', this.optimizedData);
-      const meta = JSON.stringify(this.meta);
-      fs.writeFileSync(`${DATA_DIR}/meta.json`, meta, { encoding: 'utf8' });
+      writeToJSON('data', this.optimizedData);
+      writeToJSON('meta', this.meta);
     }
   }
 
@@ -140,7 +144,7 @@ class DataScrapper {
         });
       }
     });
-    return result;
+    return optimizeObjArray(result);
   }
 }
 
