@@ -60,8 +60,8 @@ type Fields = {
   Bundesland: string;
   IdLandkreis: string;
   Landkreis: string;
-  Altersgruppe: [typeof AGES[number]][number]['de'];
-  Geschlecht: [typeof SEX[number]][number]['de'];
+  Altersgruppe: [typeof AGES[number]][number]['name'];
+  Geschlecht: [typeof SEX[number]][number]['name'];
   AnzahlFall: number;
   NeuerFall: number;
   AnzahlTodesfall: number;

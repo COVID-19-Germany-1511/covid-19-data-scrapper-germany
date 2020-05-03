@@ -83,11 +83,11 @@ export function pick<T extends {}, K extends keyof T>(
   return result;
 }
 
-export function idForName<T extends Immutable<{ id: number; de: string }>>(
+export function idForName<T extends Immutable<{ id: number; name: string }>>(
   objArr: ImmutableArray<T>,
-  nameToFind: T['de'],
+  nameToFind: T['name'],
 ): number {
-  return (objArr.find(({ de }) => de === nameToFind) as T).id;
+  return (objArr.find(({ name }) => name === nameToFind) as T).id;
 }
 
 export function findById<T extends { id: number }>(

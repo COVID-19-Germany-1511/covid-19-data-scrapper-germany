@@ -21,29 +21,29 @@ export const RKI_FIELDS = [
 ] as const;
 
 export const CASE_STATES = [
-  { id: 0, de: 'confirmed' },
-  { id: 1, de: 'death' },
+  { id: 0, name: 'confirmed' },
+  { id: 1, name: 'deaths' },
 ] as const;
 
 export const AGES = [
-  { id: 0, de: 'A00-A04' },
-  { id: 1, de: 'A05-A14' },
-  { id: 2, de: 'A15-A34' },
-  { id: 3, de: 'A35-A59' },
-  { id: 4, de: 'A60-A79' },
-  { id: 5, de: 'A80+' },
-  { id: 6, de: 'unbekannt' },
+  { id: 0, name: 'A00-A04' },
+  { id: 1, name: 'A05-A14' },
+  { id: 2, name: 'A15-A34' },
+  { id: 3, name: 'A35-A59' },
+  { id: 4, name: 'A60-A79' },
+  { id: 5, name: 'A80+' },
+  { id: 6, name: 'unbekannt' },
 ] as const;
 
 export const SEX = [
-  { id: 0, de: 'W' },
-  { id: 1, de: 'M' },
-  { id: 2, de: 'unbekannt' },
+  { id: 0, name: 'W' },
+  { id: 1, name: 'M' },
+  { id: 2, name: 'unbekannt' },
 ] as const;
 
 export type OptimizedMetaEntry = {
   id: number;
-  de: string;
+  name: string;
 };
 
 export type LicenseInformation = {
