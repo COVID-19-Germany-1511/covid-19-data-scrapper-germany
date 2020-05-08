@@ -231,7 +231,7 @@ function createGetDataRowFunction({ days }: ProvidedData) {
       let total = 0;
       days.forEach(day => {
         const counts = map.get(day) || [0, 0];
-        total = counts[1] += total;
+        total = counts[1] = counts[0] + total;
         map.set(day, counts);
       });
       return map;
