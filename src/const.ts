@@ -20,6 +20,16 @@ export const RKI_FIELDS = [
   'Datenstand',
 ] as const;
 
+export const FIELDS = ['county', 'day', 'sex', 'age', 'count'] as const;
+
+export const FIELD_KEYS = {
+  county: 0,
+  day: 1,
+  sex: 2,
+  age: 3,
+  count: 4,
+} as const;
+
 export const CASE_STATES = [
   { id: 0, name: 'confirmed' },
   { id: 1, name: 'deaths' },
@@ -81,3 +91,5 @@ export const LICENSES: {
 export type Sex = typeof SEX[number];
 export type Ages = typeof AGES[number];
 export type CaseStates = typeof CASE_STATES[number];
+export type CaseStateName = CaseStates['name'];
+export type Fields = typeof FIELDS[number];

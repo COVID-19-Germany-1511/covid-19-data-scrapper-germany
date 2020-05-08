@@ -83,5 +83,6 @@ module.exports = {
         ignoreParameters: true,
       },
     ],
+    'prettier/prettier': 'off',
   },
 };

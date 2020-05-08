@@ -35,20 +35,20 @@ export function writeToJSON(name: string, data: any) {
   fs.writeFileSync(`${DATA_DIR}/${name}.json`, json, { encoding: 'utf8' });
 }
 
-export function zipObjectArray<T extends Immutable<{ [key: string]: any }>>(
-  objArr: ImmutableArray<T>,
-): ZippedObjectArray<T> {
-  const fields = Object.keys(objArr[0]);
-  // eslint-disable-next-line prettier/prettier
-  const values = objArr.map((obj) => fields.map((field) => obj[field]));
-  return { fields, values };
+export function zipObjectArray<
+  T extends { [key: string]: any },
+  K extends keyof T
+>(objArr: T[], fields?: ImmutableArray<K>): ZippedObjectArray<T> {
+  const mapFields = (fields || Object.keys(objArr[0])) as K[];
+  const values = objArr.map(obj => mapFields.map(field => obj[field]));
+  return { fields: mapFields, values };
 }
 
-export function unzipObjectArray<T extends Immutable<{ [key: string]: any }>>({
+export function unzipObjectArray<T extends { [key: string]: any }>({
   fields,
   values,
 }: ZippedObjectArray<T>): T[] {
-  return values.map((entry) => {
+  return values.map(entry => {
     const obj: any = {};
     fields.forEach((key, index) => {
       obj[key] = entry[index];
@@ -57,9 +57,7 @@ export function unzipObjectArray<T extends Immutable<{ [key: string]: any }>>({
   });
 }
 
-export function unzipObjectArrayHeader<
-  T extends Immutable<{ [key: string]: any }>
->({
+export function unzipObjectArrayHeader<T extends { [key: string]: any }>({
   fields,
 }: ZippedObjectArray<T>): {
   [key in keyof T]: number;
@@ -76,8 +74,7 @@ export function pick<T extends {}, K extends keyof T>(
   keys: K[],
 ): Pick<T, K> {
   const result: any = {};
-  // eslint-disable-next-line prettier/prettier
-  keys.forEach((key) => {
+  keys.forEach(key => {
     result[key] = obj[key];
   });
   return result;

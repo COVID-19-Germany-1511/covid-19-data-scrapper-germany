@@ -1,5 +1,5 @@
 import { QueriedFields, fetchDataIfDifferentCount } from './api';
-import { SEX, AGES } from './const';
+import { SEX, AGES, FIELDS, Fields, CaseStateName } from './const';
 import {
   writeToCSV,
   loadCSV,
@@ -11,19 +11,12 @@ import {
 
 const MILLIES_PER_DAY = 24 * 60 * 60 * 1000;
 
+export type OptimizedRecord = Record<Fields, number>;
+
 export type OptimizedData = {
   startDate: number;
   lastUpdated: string;
-  records: ZippedObjectArray<OptimizedRecord>;
-};
-
-export type OptimizedRecord = {
-  county: number;
-  day: number;
-  sex: number;
-  age: number;
-  caseState: number;
-  count: number;
+  records: Record<CaseStateName, ZippedObjectArray<OptimizedRecord>>;
 };
 
 export class DataScrapper {
@@ -69,8 +62,7 @@ export class DataScrapper {
   }
 
   get rawData() {
-    // eslint-disable-next-line
-    return this.data.map((entry) => {
+    return this.data.map(entry => {
       const mapped = { ...entry };
       delete mapped.Bundesland;
       delete mapped.Landkreis;
@@ -79,11 +71,11 @@ export class DataScrapper {
     });
   }
 
-  get optimizedRecords(): ZippedObjectArray<OptimizedRecord> {
+  get optimizedRecords(): OptimizedData['records'] {
     const { startDate } = this;
-    const result: OptimizedRecord[] = [];
-    // eslint-disable-next-line
-    this.data.forEach((entry) => {
+    const confirmed: OptimizedRecord[] = [];
+    const deaths: OptimizedRecord[] = [];
+    this.data.forEach(entry => {
       const optimized = {
         county: parseInt(entry.IdLandkreis),
         day: (entry.Meldedatum - startDate) / MILLIES_PER_DAY,
@@ -91,20 +83,15 @@ export class DataScrapper {
         age: idForName(AGES, entry.Altersgruppe),
       };
       if (entry.AnzahlFall > 0) {
-        result.push({
-          ...optimized,
-          caseState: 0,
-          count: entry.AnzahlFall,
-        });
+        confirmed.push({ ...optimized, count: entry.AnzahlFall });
       }
       if (entry.AnzahlTodesfall > 0) {
-        result.push({
-          ...optimized,
-          caseState: 1,
-          count: entry.AnzahlTodesfall,
-        });
+        deaths.push({ ...optimized, count: entry.AnzahlTodesfall });
       }
     });
-    return zipObjectArray(result);
+    return {
+      confirmed: zipObjectArray(confirmed, FIELDS),
+      deaths: zipObjectArray(deaths, FIELDS),
+    };
   }
 }
