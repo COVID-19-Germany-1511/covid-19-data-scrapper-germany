@@ -15,6 +15,7 @@ type getDataRowFunction = (
 
 export type BaseArea = {
   id: number;
+  svgId: number;
   de: string;
   area: number;
   population: number;
@@ -69,7 +70,7 @@ async function loadJSON<T extends {}>(filename: string): Promise<T> {
   return data;
 }
 
-function emptyArea(): Omit<BaseArea, 'id' | 'de'> {
+function emptyArea(): Omit<BaseArea, 'id' | 'svgId' | 'de'> {
   return {
     population: 0,
     area: 0,
@@ -131,7 +132,7 @@ function transformMeta(
   rawMeta: OptimizedMeta,
   { startDate, lastUpdated }: OptimizedData,
 ): ProvidedData {
-  const germany = { id: 0, de: 'Deutschland', ...emptyArea() };
+  const germany = { id: 0, svgId: 0, de: 'Deutschland', ...emptyArea() };
   const states = transformStates(rawMeta);
   const counties = transformCounties(rawMeta, states, germany);
   return {

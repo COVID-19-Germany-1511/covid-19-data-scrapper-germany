@@ -11,12 +11,11 @@ import {
 
 type State = {
   id: number;
+  svgId: number;
   de: string;
 };
 
-type County = {
-  id: number;
-  de: string;
+type County = State & {
   stateId: number;
   area: number;
   population: number;
