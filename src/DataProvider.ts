@@ -214,8 +214,15 @@ function createGetDataRowFunction({ days }: ProvidedData) {
     return records;
   }
 
+  const cachedDataRows = new Map<string, Map<Date, [number, number]>>();
+
   return function (area: BaseArea): getDataRowFunction {
     return function (caseState, sex?, age?): Map<Date, [number, number]> {
+      const identifier = `${area.id}-${caseState}-${sex?.id}-${age?.id}`;
+      const cached = cachedDataRows.get(identifier);
+      if (cached) {
+        return cached;
+      }
       const map = filterRecords(area.records[caseState], sex, age).reduce(
         (numberMap, record) => {
           const day = record[dayKey] as Date;
@@ -235,6 +242,7 @@ function createGetDataRowFunction({ days }: ProvidedData) {
         total = counts[1] = counts[0] + total;
         map.set(day, counts);
       });
+      cachedDataRows.set(identifier, map);
       return map;
     };
   };
