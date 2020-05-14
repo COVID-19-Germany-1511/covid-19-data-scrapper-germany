@@ -24,11 +24,11 @@ export type BaseArea = {
   getDataRow: getDataRowFunction;
 };
 
-type State = BaseArea & {
+export type State = BaseArea & {
   counties: County[];
 };
 
-type County = BaseArea & {
+export type County = BaseArea & {
   state: State;
 };
 
@@ -39,19 +39,21 @@ type RecordList = {
   records: DataEntry[];
 };
 
-type TransformedData = Record<CaseStateName, RecordList>;
-
-export type DataEntry = Array<County | Sex | Ages | CaseStates | Date | number>;
+export type DataEntry = Array<number | Date>;
 
 export type ProvidedData = {
-  germany: BaseArea;
-  states: State[];
-  counties: County[];
-  days: Date[];
-  sex: ImmutableArray<Sex>;
-  ages: ImmutableArray<Ages>;
-  caseStates: ImmutableArray<CaseStates>;
-  lastUpdated: string;
+  areas: {
+    germany: BaseArea;
+    states: State[];
+    counties: County[];
+  };
+  meta: {
+    days: Date[];
+    sex: ImmutableArray<Sex>;
+    ages: ImmutableArray<Ages>;
+    caseStates: ImmutableArray<CaseStates>;
+    lastUpdated: string;
+  };
 };
 
 export type Status = 'start' | 'loading' | 'transforming' | 'ready';
@@ -96,7 +98,7 @@ function transformStates({ states }: OptimizedMeta): State[] {
 
 function transformCounties(
   { counties }: OptimizedMeta,
-  states: ProvidedData['states'],
+  states: ProvidedData['areas']['states'],
   germany: BaseArea,
 ): County[] {
   return unzipObjectArray(counties).map(county => {
@@ -117,7 +119,7 @@ function transformCounties(
   });
 }
 
-function buildDays(startDate: number): ProvidedData['days'] {
+function buildDays(startDate: number): ProvidedData['meta']['days'] {
   const now = new Date();
   const cur = new Date(startDate);
   const days = [];
@@ -125,7 +127,14 @@ function buildDays(startDate: number): ProvidedData['days'] {
     days.push(new Date(cur));
     cur.setDate(cur.getDate() + 1);
   }
+  Object.freeze(days);
   return days;
+}
+
+function freeze(arr: ImmutableArray<any>) {
+  arr.forEach(obj => Object.freeze(obj));
+  Object.freeze(arr);
+  return arr;
 }
 
 function transformMeta(
@@ -136,71 +145,69 @@ function transformMeta(
   const states = transformStates(rawMeta);
   const counties = transformCounties(rawMeta, states, germany);
   return {
-    lastUpdated,
-    germany,
-    states,
-    counties,
-    days: buildDays(startDate),
-    sex: rawMeta.sex,
-    ages: rawMeta.ages,
-    caseStates: rawMeta.caseStates,
+    areas: {
+      germany,
+      states,
+      counties,
+    },
+    meta: {
+      lastUpdated,
+      days: buildDays(startDate),
+      sex: freeze(rawMeta.sex),
+      ages: freeze(rawMeta.ages),
+      caseStates: freeze(rawMeta.caseStates),
+    },
   };
 }
 
-function createFindFunction<T extends { id: number }>(
-  objArr: ImmutableArray<T>,
-) {
-  return function (idToFind: number) {
-    return objArr.find(({ id }) => id === idToFind) as T;
-  };
-}
-
-function createMapDataFunction(meta: ProvidedData) {
-  const findCounties = createFindFunction(meta.counties);
-  const findSex = createFindFunction(meta.sex);
-  const findAge = createFindFunction(meta.ages);
-
+function createMapDataFunction({ meta: { days } }: ProvidedData) {
   return function (record: number[]): RecordList['records'][number] {
     const mapped = [...record] as RecordList['records'][number];
-    mapped[dayKey] = meta.days[record[dayKey]];
-    mapped[countyKey] = findCounties(record[countyKey]);
-    mapped[sexKey] = findSex(record[sexKey]);
-    mapped[ageKey] = findAge(record[ageKey]);
+    mapped[dayKey] = days[record[dayKey]];
+    Object.freeze(mapped);
     return mapped;
   };
 }
 
-function createLinkDataFunction({ germany }: ProvidedData) {
+function createLinkDataFunction({
+  areas: { germany, counties },
+}: ProvidedData) {
+  const germanyRecords = germany.records;
+  const germanyTotal = germany.total;
+
+  function findCounty(countyId: number) {
+    return counties.find(({ id }) => id === countyId);
+  }
+
   return function (record: DataEntry, caseState: CaseStateName): void {
-    const curCounty = record[countyKey] as County;
+    const curCounty = findCounty(record[countyKey] as number) as County;
     const curCount = record[countKey] as number;
     curCounty.records[caseState].push(record);
     curCounty.state.records[caseState].push(record);
-    germany.records[caseState].push(record);
+    germanyRecords[caseState].push(record);
     curCounty.total[caseState] += curCount;
     curCounty.state.total[caseState] += curCount;
-    germany.total[caseState] += curCount;
+    germanyTotal[caseState] += curCount;
   };
 }
 
-function transformAndLinkData(meta: ProvidedData, { records }: OptimizedData) {
-  const mapFunction = createMapDataFunction(meta);
-  const linkFunction = createLinkDataFunction(meta);
-  const caseStates: CaseStateName[] = ['confirmed', 'deaths'];
-  caseStates.forEach(caseState => {
-    records[caseState].values.map(record => {
-      const mapped = mapFunction(record);
-      linkFunction(mapped, caseState);
-      return mapped;
+function transformAndLinkData(data: ProvidedData, { records }: OptimizedData) {
+  const mapDataFunction = createMapDataFunction(data);
+  const linkFunction = createLinkDataFunction(data);
+
+  Object.entries(records).forEach(([caseState, records]) => {
+    records.values.forEach(record => {
+      const mapped = mapDataFunction(record);
+      linkFunction(mapped, caseState as CaseStateName);
     });
   });
 }
 
-function createGetDataRowFunction({ days }: ProvidedData) {
+function createGetDataRowFunction({ days }: ProvidedData['meta']) {
   function filterRecords(
     records: DataEntry[],
-    sex?: Sex,
-    age?: Ages,
+    sex?: number,
+    age?: number,
   ): DataEntry[] {
     if (sex && age) {
       return records.filter(
@@ -223,36 +230,39 @@ function createGetDataRowFunction({ days }: ProvidedData) {
       if (cached) {
         return cached;
       }
-      const map = filterRecords(area.records[caseState], sex, age).reduce(
-        (numberMap, record) => {
-          const day = record[dayKey] as Date;
-          const count = record[countKey] as number;
-          if (numberMap.has(day)) {
-            (numberMap.get(day) as number[])[0] += count;
-          } else {
-            numberMap.set(day, [count, 0]);
-          }
-          return numberMap;
-        },
-        new Map<Date, [number, number]>(),
-      );
+      const map = filterRecords(
+        area.records[caseState],
+        sex?.id,
+        age?.id,
+      ).reduce((numberMap, record) => {
+        const day = record[dayKey] as Date;
+        const count = record[countKey] as number;
+        if (numberMap.has(day)) {
+          (numberMap.get(day) as number[])[0] += count;
+        } else {
+          numberMap.set(day, [count, 0]);
+        }
+        return numberMap;
+      }, new Map<Date, [number, number]>());
       let total = 0;
       days.forEach(day => {
         const counts = map.get(day) || [0, 0];
         total = counts[1] = counts[0] + total;
         map.set(day, counts);
       });
+      Object.freeze(map);
       cachedDataRows.set(identifier, map);
       return map;
     };
   };
 }
 
-function setDataRowGetter(meta: ProvidedData): void {
+function setDataRowGetter({ areas, meta }: ProvidedData): void {
   const getDataRowFunction = createGetDataRowFunction(meta);
-  const { germany, states, counties } = meta;
+  const { germany, states, counties } = areas;
   [germany, ...states, ...counties].forEach(area => {
     area.getDataRow = getDataRowFunction(area);
+    Object.freeze(area);
   });
 }
 
@@ -270,5 +280,6 @@ export async function loadData(
   transformAndLinkData(meta, rawData);
   setDataRowGetter(meta);
   statusHandler('ready');
-  return { ...meta };
+  Object.freeze(meta);
+  return meta;
 }
