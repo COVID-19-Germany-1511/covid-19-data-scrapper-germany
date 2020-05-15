@@ -15,8 +15,22 @@ export type OptimizedRecord = Record<Fields, number>;
 
 export type OptimizedData = {
   startDate: number;
-  lastUpdated: string;
+  lastUpdated: Date;
   records: Record<CaseStateName, ZippedObjectArray<OptimizedRecord>>;
+};
+
+export type BaseAreaStat = {
+  id: number;
+} & {
+  [state in CaseStateName]: {
+    total: number;
+    perPop: number;
+  };
+};
+
+export type DataToday = {
+  date: Date;
+  areas: BaseAreaStat[];
 };
 
 export class DataScrapper {
@@ -42,11 +56,25 @@ export class DataScrapper {
       writeToCSV('data', this.rawData);
       const optimizedData: OptimizedData = {
         startDate: this.startDate,
-        lastUpdated: this.data[0].Datenstand,
+        lastUpdated: this.lastUpdated as Date,
         records: this.optimizedRecords,
       };
       writeToJSON('data', optimizedData);
     }
+  }
+
+  get lastUpdated(): Date | null {
+    if (!this.data.length) {
+      return null;
+    }
+    // e.g. 15.05.2020, 00:00 Uhr
+    const pattern = /^(\d{2}).(\d{2}).(\d{4}),\s(\d{1,2}):(\d{2})\sUhr$/gm;
+    const [, day, month, year, rawHour, min] = pattern.exec(
+      this.data[0].Datenstand,
+    ) as RegExpExecArray;
+    return new Date(
+      `${year}-${month}-${day}T${('0' + rawHour).slice(-2)}:${min}:00`,
+    );
   }
 
   get days(): number[] {

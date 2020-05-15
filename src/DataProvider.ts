@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 import { OptimizedData, OptimizedRecord } from './DataScrapper';
-import { OptimizedMeta } from './meta-data';
+import { Area, OptimizedMeta } from './meta-data';
 
 import { Sex, Ages, CaseStates, CaseStateName, FIELD_KEYS } from './const';
 
@@ -13,16 +13,13 @@ type getDataRowFunction = (
   age?: Ages,
 ) => Map<Date, [number, number]>;
 
-export type BaseArea = {
-  id: number;
-  svgId: number;
-  de: string;
-  area: number;
-  population: number;
+type AreaAdditional = {
   records: Record<CaseStateName, DataEntry[]>;
   total: Record<CaseStateName, number>;
   getDataRow: getDataRowFunction;
 };
+
+export type BaseArea = Area & AreaAdditional;
 
 export type State = BaseArea & {
   counties: County[];
@@ -52,7 +49,7 @@ export type ProvidedData = {
     sex: ImmutableArray<Sex>;
     ages: ImmutableArray<Ages>;
     caseStates: ImmutableArray<CaseStates>;
-    lastUpdated: string;
+    lastUpdated: Date;
   };
 };
 
@@ -72,10 +69,8 @@ async function loadJSON<T extends {}>(filename: string): Promise<T> {
   return data;
 }
 
-function emptyArea(): Omit<BaseArea, 'id' | 'svgId' | 'de'> {
+function emptyArea(): AreaAdditional {
   return {
-    population: 0,
-    area: 0,
     records: {
       confirmed: [],
       deaths: [],
@@ -99,22 +94,17 @@ function transformStates({ states }: OptimizedMeta): State[] {
 function transformCounties(
   { counties }: OptimizedMeta,
   states: ProvidedData['areas']['states'],
-  germany: BaseArea,
 ): County[] {
   return unzipObjectArray(counties).map(county => {
     const { stateId } = county;
     delete county.stateId;
     const state = states.find(({ id }) => id === stateId) as State;
-    const mapped = {
+    const mapped: County = {
       ...emptyArea(),
       ...county,
       state,
     };
-    state.counties.push((mapped as unknown) as County);
-    state.population += mapped.population;
-    state.area += mapped.area;
-    germany.population += mapped.population;
-    germany.area += mapped.area;
+    state.counties.push(mapped);
     return mapped;
   });
 }
@@ -141,12 +131,11 @@ function transformMeta(
   rawMeta: OptimizedMeta,
   { startDate, lastUpdated }: OptimizedData,
 ): ProvidedData {
-  const germany = { id: 0, svgId: 0, de: 'Deutschland', ...emptyArea() };
   const states = transformStates(rawMeta);
-  const counties = transformCounties(rawMeta, states, germany);
+  const counties = transformCounties(rawMeta, states);
   return {
     areas: {
-      germany,
+      germany: { ...emptyArea(), ...rawMeta.germany },
       states,
       counties,
     },

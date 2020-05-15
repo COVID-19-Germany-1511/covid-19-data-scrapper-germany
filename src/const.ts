@@ -70,7 +70,7 @@ export const LICENSES: {
       asOf: '31.12.2018',
       provider:
         'Statistische Ämter des Bundes und der Länder, Deutschland, 2020',
-      license: 'CC BY 2.0 DE.',
+      license: 'CC BY 2.0 DE',
     },
   ],
   population: [
