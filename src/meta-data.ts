@@ -23,7 +23,7 @@ export type Area = {
   population: number;
 };
 
-type County = Area & {
+export type County = Area & {
   stateId: number;
 };
 

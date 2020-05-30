@@ -35,6 +35,17 @@ export function writeToJSON(name: string, data: any) {
   fs.writeFileSync(`${DATA_DIR}/${name}.json`, json, { encoding: 'utf8' });
 }
 
+export function loadJSON(name: string): any {
+  const fileName = `${DATA_DIR}/${name}.json`;
+  if (!fs.existsSync(fileName)) {
+    return;
+  }
+  const file = fs.readFileSync(fileName, {
+    encoding: 'utf8',
+  });
+  return JSON.parse(file);
+}
+
 export function zipObjectArray<
   T extends { [key: string]: any },
   K extends keyof T
