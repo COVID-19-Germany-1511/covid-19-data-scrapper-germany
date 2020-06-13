@@ -104,3 +104,14 @@ export function findById<T extends { id: number }>(
 ): T {
   return objArr.find(({ id }) => id === idToFind) as T;
 }
+
+export function buildDays(startDate: number): Date[] {
+  const now = new Date();
+  const cur = new Date(startDate);
+  const days = [];
+  while (cur < now) {
+    days.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}

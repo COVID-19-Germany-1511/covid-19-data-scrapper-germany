@@ -12,14 +12,22 @@ import {
 } from './lib';
 import type { Area, County, OptimizedMeta } from './meta-data';
 
-const MILLIES_PER_DAY = 24 * 60 * 60 * 1000;
-
 export type OptimizedRecord = Record<Fields, number>;
 
 export type OptimizedData = {
   startDate: number;
   lastUpdated: Date;
   records: Record<CaseStateName, ZippedObjectArray<OptimizedRecord>>;
+};
+
+export type DataMinimal = {
+  startDate: number;
+  lastUpdated: Date;
+  areas: Array<
+    {
+      id: number;
+    } & Record<CaseStateName, number[]>
+  >;
 };
 
 export type BaseAreaStat = {
@@ -31,6 +39,8 @@ export type DataToday = {
   areas: BaseAreaStat[];
 };
 
+const MILLIES_PER_DAY = 24 * 60 * 60 * 1000;
+
 function createAreaStat({ id }: Area): BaseAreaStat {
   return {
     id,
@@ -41,17 +51,6 @@ function createAreaStat({ id }: Area): BaseAreaStat {
 }
 
 const META = loadJSON('meta') as OptimizedMeta;
-
-function buildListAdder(list: OptimizedRecord[]) {
-  list.splice(0, list.length);
-
-  return (optimized: Omit<OptimizedRecord, 'count'>, count: number) => {
-    if (count > 0) {
-      list.push({ ...optimized, count });
-    }
-    return count;
-  };
-}
 
 function addStat(areaStat: BaseAreaStat, countyStat: BaseAreaStat): void {
   areaStat.confirmed += countyStat.confirmed;
@@ -70,6 +69,114 @@ function parseUpdateDate(dateString: string): Date {
   );
 }
 
+function createListAdder(
+  lists: Record<CaseStateName, OptimizedRecord[]>,
+  countyRows: Map<number, Map<number, Record<CaseStateName, number>>>,
+) {
+  function createAdder(
+    casestate: CaseStateName,
+    countName: 'AnzahlFall' | 'AnzahlTodesfall' | 'AnzahlGenesen',
+  ) {
+    lists[casestate].splice(0, lists[casestate].length);
+    return (
+      entry: QueriedFields,
+      optimized: Omit<OptimizedRecord, 'count'>,
+      dayEntry: Record<CaseStateName, number>,
+    ) => {
+      const count = entry[countName];
+      if (count > 0) {
+        lists[casestate].push({ ...optimized, count });
+        dayEntry[casestate] += count;
+      }
+    };
+  }
+
+  const confirmedAdder = createAdder('confirmed', 'AnzahlFall');
+  const deathsAdder = createAdder('deaths', 'AnzahlTodesfall');
+  const recoveredAdder = createAdder('recovered', 'AnzahlGenesen');
+
+  return (entry: QueriedFields, optimized: Omit<OptimizedRecord, 'count'>) => {
+    const countyRow = countyRows.get(optimized.county) as Map<
+      number,
+      Record<CaseStateName, number>
+    >;
+    const dayEntry = countyRow.get(optimized.day) || {
+      confirmed: 0,
+      deaths: 0,
+      recovered: 0,
+    };
+    confirmedAdder(entry, optimized, dayEntry);
+    deathsAdder(entry, optimized, dayEntry);
+    recoveredAdder(entry, optimized, dayEntry);
+    countyRow.set(optimized.day, dayEntry);
+  };
+}
+
+function transformCountyRows(
+  countyRows: Map<number, Map<number, Record<CaseStateName, number>>>,
+  daysCount: number,
+): Map<number, Record<CaseStateName, number[]>> {
+  const result = new Map();
+  for (const [county, dayRecords] of countyRows) {
+    const changes: Record<CaseStateName, number[]> = {
+      confirmed: [],
+      deaths: [],
+      recovered: [],
+    };
+    for (let i = 0; i < daysCount; i++) {
+      const dayRecord = dayRecords.get(i) || {
+        confirmed: 0,
+        deaths: 0,
+        recovered: 0,
+      };
+      changes.confirmed.push(dayRecord.confirmed);
+      changes.deaths.push(dayRecord.deaths);
+      changes.recovered.push(dayRecord.recovered);
+    }
+    result.set(county, changes);
+  }
+  return result;
+}
+
+function sumDataRows(
+  dataRows: Record<CaseStateName, number[]>,
+): Record<CaseStateName, number> {
+  const result: any = {};
+  (['confirmed', 'deaths', 'recovered'] as CaseStateName[]).forEach(
+    caseState => {
+      result[caseState] = dataRows[caseState].reduce(
+        (sum, cur) => sum + cur,
+        0,
+      );
+    },
+  );
+  return result;
+}
+
+function addDataRows(
+  { confirmed, deaths, recovered }: Record<CaseStateName, number[]>,
+  targetA: Record<CaseStateName, number[]>,
+  targetB: Record<CaseStateName, number[]>,
+): void {
+  const confirmedA = targetA.confirmed;
+  const deathsA = targetA.deaths;
+  const recoveredA = targetA.recovered;
+
+  const confirmedB = targetB.confirmed;
+  const deathsB = targetB.deaths;
+  const recoveredB = targetB.recovered;
+
+  for (let i = 0; i < confirmed.length; i++) {
+    confirmedA[i] += confirmed[i];
+    deathsA[i] += deaths[i];
+    recoveredA[i] += recovered[i];
+
+    confirmedB[i] += confirmed[i];
+    deathsB[i] += deaths[i];
+    recoveredB[i] += recovered[i];
+  }
+}
+
 export class DataScrapper {
   data: QueriedFields[] = [];
   optimizedRecords: Record<CaseStateName, OptimizedRecord[]> = {
@@ -77,9 +184,6 @@ export class DataScrapper {
     deaths: [],
     recovered: [],
   };
-  countyStats: BaseAreaStat[] = unzipObjectArray(META.counties).map(
-    createAreaStat,
-  );
   days: {
     first: number | null;
     last: number | null;
@@ -89,12 +193,14 @@ export class DataScrapper {
     last: null,
     updated: null,
   };
+  dataRows: Array<{ id: number } & Record<CaseStateName, number[]>> = [];
+  dataToday: BaseAreaStat[] = [];
 
   async run() {
     await this.fetchData();
     if (this.data.length) {
       this.setDays();
-      this.optimizeRecords();
+      this.processData();
       this.save();
     }
   }
@@ -110,12 +216,13 @@ export class DataScrapper {
   }
 
   save() {
-    const confirmedCasesEverywhere = this.countyStats.every(
+    const confirmedCasesEverywhere = this.dataToday.every(
       ({ confirmed }) => confirmed > 0,
     );
     if (confirmedCasesEverywhere) {
-      this.saveRawData();
+      // this.saveRawData();
       this.saveOptimizedData();
+      this.saveMinimalDataRows();
       this.saveDataOfToday();
     }
   }
@@ -132,8 +239,8 @@ export class DataScrapper {
   saveOptimizedData() {
     const { confirmed, deaths, recovered } = this.optimizedRecords;
     const optimizedData: OptimizedData = {
-      startDate: this.days.first as number,
-      lastUpdated: this.days.updated as Date,
+      startDate: this.days.first!,
+      lastUpdated: this.days.updated!,
       records: {
         confirmed: zipObjectArray(confirmed, FIELDS),
         deaths: zipObjectArray(deaths, FIELDS),
@@ -145,10 +252,19 @@ export class DataScrapper {
 
   saveDataOfToday() {
     const today: DataToday = {
-      date: this.days.updated as Date,
+      date: this.days.updated!,
       areas: this.dataToday,
     };
     writeToJSON('today', today);
+  }
+
+  saveMinimalDataRows() {
+    const data: DataMinimal = {
+      startDate: this.days.first!,
+      lastUpdated: this.days.updated!,
+      areas: this.dataRows,
+    };
+    writeToJSON('data-minimal', data);
   }
 
   setDays() {
@@ -168,47 +284,65 @@ export class DataScrapper {
     this.days.updated = parseUpdateDate(this.data[0].Datenstand);
   }
 
-  optimizeRecords(): void {
+  processData(): void {
     const firstDay = this.days.first as number;
-
-    const confirmedAdder = buildListAdder(this.optimizedRecords.confirmed);
-    const deathsAdder = buildListAdder(this.optimizedRecords.deaths);
-    const recoveredAdder = buildListAdder(this.optimizedRecords.recovered);
+    const countyRows: Map<
+      number,
+      Map<number, Record<CaseStateName, number>>
+    > = new Map();
+    unzipObjectArray(META.counties).forEach(({ id }) => {
+      countyRows.set(id, new Map());
+    });
+    const addToList = createListAdder(this.optimizedRecords, countyRows);
 
     this.data.forEach(entry => {
-      const county = parseInt(entry.IdLandkreis);
       const optimized = {
-        county,
+        county: parseInt(entry.IdLandkreis),
         day: (entry.Refdatum - firstDay) / MILLIES_PER_DAY,
         sex: idForName(SEX, entry.Geschlecht),
         age: idForName(AGES, entry.Altersgruppe),
       };
-      const countyStat = this.countyStats.find(
-        ({ id }) => id === county,
-      ) as BaseAreaStat;
-      countyStat.confirmed += confirmedAdder(optimized, entry.AnzahlFall);
-      countyStat.deaths += deathsAdder(optimized, entry.AnzahlTodesfall);
-      countyStat.recovered += recoveredAdder(optimized, entry.AnzahlGenesen);
+      addToList(entry, optimized);
     });
+    const daysCount = (this.days.last! - firstDay) / MILLIES_PER_DAY;
+    const countyDataRows = transformCountyRows(countyRows, daysCount);
+    this.buildDataRows(countyDataRows, daysCount);
   }
 
-  get dataToday(): BaseAreaStat[] {
-    const metaGermany = META.germany;
-    const metaStates = unzipObjectArray(META.states);
+  buildDataRows(
+    countyDataRows: Map<
+      number,
+      Record<'confirmed' | 'deaths' | 'recovered', number[]>
+    >,
+    daysCount: number,
+  ) {
+    function toRecords({ id }: Area) {
+      const arr = [];
+      for (let i = 0; i < daysCount; i++) {
+        arr.push(0);
+      }
+      return {
+        id,
+        confirmed: [...arr],
+        deaths: [...arr],
+        recovered: [...arr],
+      };
+    }
+
+    const germany = toRecords(META.germany);
+    this.dataRows.push(germany);
+    const states = unzipObjectArray(META.states).map(toRecords);
+    this.dataRows.push(...states);
     const metaCounties = unzipObjectArray(META.counties);
-    const germany = createAreaStat(metaGermany);
-    const states = metaStates.map(createAreaStat);
-
-    this.countyStats.forEach(countyStat => {
-      const countyMeta = metaCounties.find(
-        ({ id }) => id === countyStat.id,
-      ) as County;
-      const { stateId } = countyMeta;
-      const state = states.find(({ id }) => id === stateId) as BaseAreaStat;
-      addStat(state, countyStat);
-      addStat(germany, countyStat);
-    });
-
-    return [germany, ...states, ...this.countyStats];
+    for (const [countyId, records] of countyDataRows) {
+      const { stateId } = metaCounties.find(({ id }) => id === countyId)!;
+      const state = states.find(({ id }) => id === stateId)!;
+      addDataRows(records, state, germany);
+      this.dataRows.push({ id: countyId, ...records });
+    }
+    this.dataToday = this.dataRows.map(entry => ({
+      id: entry.id,
+      ...sumDataRows(entry),
+    }));
   }
 }

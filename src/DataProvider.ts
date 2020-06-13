@@ -5,7 +5,7 @@ import { Area, OptimizedMeta } from './meta-data';
 
 import { Sex, Ages, CaseStates, CaseStateName, FIELD_KEYS } from './const';
 
-import { unzipObjectArray } from './lib';
+import { unzipObjectArray, buildDays } from './lib';
 
 type getDataRowFunction = (
   caseState: CaseStateName,
@@ -109,18 +109,6 @@ function transformCounties(
     state.counties.push(mapped);
     return mapped;
   });
-}
-
-function buildDays(startDate: number): ProvidedData['meta']['days'] {
-  const now = new Date();
-  const cur = new Date(startDate);
-  const days = [];
-  while (cur < now) {
-    days.push(new Date(cur));
-    cur.setDate(cur.getDate() + 1);
-  }
-  Object.freeze(days);
-  return days;
 }
 
 function freeze(arr: ImmutableArray<any>) {
