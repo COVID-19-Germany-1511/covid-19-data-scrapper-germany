@@ -74,10 +74,12 @@ function emptyArea(): AreaAdditional {
     records: {
       confirmed: [],
       deaths: [],
+      recovered: [],
     },
     total: {
       confirmed: 0,
       deaths: 0,
+      recovered: 0,
     },
     getDataRow: () => new Map(),
   };

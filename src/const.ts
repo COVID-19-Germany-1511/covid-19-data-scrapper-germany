@@ -4,21 +4,22 @@ export const API_URLS = {
 };
 export const RKI_PAGE_SIZE = 2000;
 
-export const RKI_FIELDS = [
-  'ObjectId',
-  'IdBundesland',
-  'Bundesland',
-  'IdLandkreis',
-  'Landkreis',
-  'Altersgruppe',
-  'Geschlecht',
-  'AnzahlFall',
-  'NeuerFall',
-  'AnzahlTodesfall',
-  'NeuerTodesfall',
-  'Meldedatum',
-  'Datenstand',
-] as const;
+// export const RKI_FIELDS = [
+//   // 'ObjectId',
+//   'IdBundesland',
+//   // 'Bundesland',
+//   'IdLandkreis',
+//   // 'Landkreis',
+//   'Altersgruppe',
+//   'Geschlecht',
+//   'AnzahlFall',
+//   // 'NeuerFall',
+//   'AnzahlTodesfall',
+//   // 'NeuerTodesfall',
+//   'AnzahlGenesen',
+//   'Meldedatum',
+//   'Datenstand',
+// ] as const;
 
 export const FIELDS = ['county', 'day', 'sex', 'age', 'count'] as const;
 
@@ -33,6 +34,7 @@ export const FIELD_KEYS = {
 export const CASE_STATES = [
   { id: 0, name: 'confirmed' },
   { id: 1, name: 'deaths' },
+  { id: 2, name: 'recovered' },
 ] as const;
 
 export const AGES = [

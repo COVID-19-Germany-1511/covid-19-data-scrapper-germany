@@ -55,34 +55,56 @@ type Response = {
 };
 
 type Fields = {
+  /** ID of database-entry */
   ObjectId: number;
+  /** ID of state */
   IdBundesland: number;
+  /** name of state */
   Bundesland: string;
+  /** Id of county */
   IdLandkreis: string;
+  /** name of county */
   Landkreis: string;
+  /** age */
   Altersgruppe: [typeof AGES[number]][number]['name'];
+  /** sex */
   Geschlecht: [typeof SEX[number]][number]['name'];
+  /** confirmed cases for county, age & sex */
   AnzahlFall: number;
-  NeuerFall: number;
+  /** 1 seems to mean new record in database */
+  NeuerFall: 0 | 1 | -9;
+  /** deaths for county, age & sex */
   AnzahlTodesfall: number;
-  NeuerTodesfall: number;
+  /** 1 seems to mean new record in database */
+  NeuerTodesfall: 0 | 1 | -9;
+  /** date when case was reported to RKI */
   Meldedatum: number;
+  /** date of last database update */
   Datenstand: string;
+  // what is that for? it's mostly some days older than the Meldedatum.
+  // was also the same day on some occasions. Maybe the Date when it was confirmed?
+  Refdatum: number;
+  /** 1 seems to mean new record in database */
+  NeuGenesen: 0 | 1 | -9;
+  /** recovered cases for county, age & sex (by guess) */
+  AnzahlGenesen: number;
+  IstErkrankungsbeginn: 0 | 1;
+  /** not used */
+  Altersgruppe2: 'Nicht übermittelt';
 };
-
-type FieldsArray = Array<keyof Fields>;
 
 const QUERY_FIELDS = [
   'IdBundesland',
-  'Bundesland',
   'IdLandkreis',
-  'Landkreis',
   'Altersgruppe',
   'Geschlecht',
   'AnzahlFall',
   'AnzahlTodesfall',
+  'AnzahlGenesen',
   'Meldedatum',
+  'Refdatum',
   'Datenstand',
+  'IstErkrankungsbeginn',
 ] as const;
 
 export type QueriedFields = Pick<Fields, ValuesOf<typeof QUERY_FIELDS>>;
